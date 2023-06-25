@@ -34,7 +34,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle* networkStyle) 
     float fontFactor = 1.0;
 
     // define text to place
-    QString titleText = tr("PRivaCY Coin Wallet Main");
+    QString titleText = tr("PRivaCY Coin Wallet Testing");
     fLiteMode = GetBoolArg("-litemode", false);
     if (fLiteMode) {
         titleText = tr("PRivaCY Coin Lite Mode Wallet");
