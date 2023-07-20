@@ -2075,9 +2075,14 @@ UniValue getwalletinfo(const UniValue& params, bool fHelp)
             "\nResult:\n"
             "{\n"
             "  \"walletversion\": xxxxx,      (numeric) the wallet version\n"
-            "  \"balance\": xxxxxxx,          (numeric) the total PRCY balance of the wallet\n"
-            "  \"unconfirmed_balance\": xxx, (numeric) the total unconfirmed balance of the wallet in PRCY\n"
-            "  \"immature_balance\": xxxxxx, (numeric) the total immature balance of the wallet in PRCY\n"
+            "  \"balances\":                  (string) A json array of balances\n"
+            "     {\n"
+            "       \"total\":                (numeric) the total balance of the wallet in PRCY\n"
+            "       \"spendable\":            (numeric) the total spendable balance of the wallet in PRCY\n"
+            "       \"pending\":              (numeric) the total pending balance of the wallet in PRCY\n"
+            "       \"immature\":             (numeric) the total immature balance of the wallet in PRCY\n"
+            "       \"locked\":               (numeric) the total locked balance of the wallet in PRCY\n"
+            "     },\n"
             "  \"txcount\": xxxxxxx,          (numeric) the total number of transactions in the wallet\n"
             "  \"keypoololdest\": xxxxxx,     (numeric) the timestamp (seconds since GMT epoch) of the oldest pre-generated key in the key pool\n"
             "  \"keypoolsize\": xxxx,         (numeric) how many new keys are pre-generated\n"
@@ -2092,9 +2097,13 @@ UniValue getwalletinfo(const UniValue& params, bool fHelp)
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("walletversion", pwalletMain->GetVersion());
-    obj.pushKV("balance", ValueFromAmount(pwalletMain->GetBalance()));
-    obj.pushKV("unconfirmed_balance", ValueFromAmount(pwalletMain->GetUnconfirmedBalance()));
-    obj.pushKV("immature_balance",    ValueFromAmount(pwalletMain->GetImmatureBalance()));
+    UniValue balances(UniValue::VOBJ);
+    balances.pushKV("total", ValueFromAmount(pwalletMain->GetBalance()));
+    balances.pushKV("spendable", ValueFromAmount(pwalletMain->GetSpendableBalance()));
+    balances.pushKV("pending", ValueFromAmount(pwalletMain->GetUnconfirmedBalance()));
+    balances.pushKV("immature", ValueFromAmount(pwalletMain->GetImmatureBalance()));
+    balances.pushKV("locked", ValueFromAmount(pwalletMain->GetLockedCoins()));
+    obj.pushKV("balances", balances);
     obj.pushKV("txcount", (int)pwalletMain->mapWallet.size());
     obj.pushKV("keypoololdest", pwalletMain->GetOldestKeyPoolTime());
     obj.pushKV("keypoolsize", (int)pwalletMain->GetKeyPoolSize());
