@@ -6,6 +6,7 @@
 #define BITCOIN_QT_OVERVIEWPAGE_H
 
 #include "amount.h"
+#include "curl_json.h"
 
 #include <QWidget>
 #include <QTimer>
@@ -13,7 +14,6 @@
 #include <QDialog>
 #include <QSizeGrip>
 #include <QSettings>
-#include <QNetworkReply>
 
 class ClientModel;
 class TransactionFilterProxy;
@@ -94,8 +94,7 @@ private:
     // Check Currency Value via CoinGecko.com API
     QTimer* updateJSONtimer;
     QTimer* updateGUItimer;
-    QNetworkAccessManager* manager;
-    QNetworkReply* reply;
+    JsonDownload* cgReply;
 
 private Q_SLOTS:
     void updateDisplayUnit();

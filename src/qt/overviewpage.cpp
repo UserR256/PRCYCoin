@@ -126,8 +126,7 @@ OverviewPage::OverviewPage(QWidget* parent) : QDialog(parent, Qt::WindowSystemMe
     // Init getCurrencyValueInterval
     updateJSONtimer = new QTimer(this);
     updateGUItimer = new QTimer(this);
-    manager = new QNetworkAccessManager(this);
-    reply = nullptr;
+    cgReply = new JsonDownload;
 
     connect(updateJSONtimer, SIGNAL(timeout()), SLOT(getCurrencyValue()));
     connect(updateGUItimer, SIGNAL(timeout()), SLOT(setCurrencyValue()));
@@ -583,7 +582,7 @@ void OverviewPage::getCurrencyValue()
         ui->labelCurrencyValue->setText("");
         return;
     }
-    getHttpsJson("https://api.coingecko.com/api/v3/simple/price?ids=prcy-coin&vs_currencies=" + defaultCurrency.toStdString() + "&include_market_cap=false&include_24hr_vol=false&include_24hr_change=false&include_last_updated_at=false");
+    getHttpsJson("https://api.coingecko.com/api/v3/simple/price?ids=prcy-coin&vs_currencies=" + defaultCurrency.toStdString() + "&include_market_cap=false&include_24hr_vol=false&include_24hr_change=false&include_last_updated_at=false", cgReply, CG_HEADERS);
 }
 
 void OverviewPage::setCurrencyValue()
@@ -609,10 +608,10 @@ void OverviewPage::setCurrencyValue()
         defaultCurrencySymbol = "XAG";
     }
 
-    if (downloadedJSON.failed == false && downloadedJSON.complete == true) {
+    if (cgReply->failed == false && cgReply->complete == true) {
         try {
             // Parse data
-            QJsonDocument jsonDocument(QJsonDocument::fromJson(downloadedJSON.response.c_str()));
+            QJsonDocument jsonDocument(QJsonDocument::fromJson(cgReply->response.c_str()));
             const QJsonObject item  = jsonDocument.object();
             const QJsonObject currency  = item["prcy-coin"].toObject();
             auto currencyValue = currency[defaultCurrency.toLower()].toDouble();
