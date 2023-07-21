@@ -71,7 +71,6 @@ public:
 #endif // ENABLE_WALLET
     bool enableWallet;
     bool fMultiSend = false;
-    bool isStartup = true;
     
 protected:
     void changeEvent(QEvent* e);
@@ -284,7 +283,8 @@ private Q_SLOTS:
     void openDexClicked();
     void openToolkitClicked();
     void checkForUpdatesClicked();
-    void checkForUpdatesFinished();
+    void checkForUpdates(bool isClicked = false);
+    void checkForUpdatesFinished(bool isClicked);
 #ifndef Q_OS_MAC
     /** Handle tray icon clicked */
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
