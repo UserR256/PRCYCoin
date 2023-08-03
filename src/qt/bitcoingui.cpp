@@ -60,8 +60,9 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QDesktopServices>
-#include <QNetworkAccessManager>
-#include <QUrlQuery>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #define BASE_WINDOW_WIDTH 800
 #define BASE_WINDOW_HEIGHT 768
@@ -254,7 +255,9 @@ BitcoinGUI::BitcoinGUI(const NetworkStyle* networkStyle, QWidget* parent) : QMai
         timerStakingIcon->start(10000);
         setStakingStatus();
     }
-    checkForUpdatesClicked();
+
+    gitReply = new JsonDownload;
+    checkForUpdates();
 }
 
 BitcoinGUI::~BitcoinGUI()
@@ -982,52 +985,70 @@ void BitcoinGUI::openToolkitClicked()
 
 void BitcoinGUI::checkForUpdatesClicked()
 {
-    LogPrintf("Check For Updates: Checking...\n");
-    QUrl serviceUrl = QUrl("https://raw.githubusercontent.com/PRCYCoin/PRCYCoin/master/version.txt");
-    QNetworkAccessManager *manager = new QNetworkAccessManager(this);
-    connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(serviceRequestFinished(QNetworkReply*)));
-    QNetworkRequest request;
-    request.setUrl(serviceUrl);
-    QNetworkReply* reply = manager->get(request);
+    checkForUpdates(true);
 }
 
-void BitcoinGUI::serviceRequestFinished(QNetworkReply* reply)
+void BitcoinGUI::checkForUpdates(bool isClicked)
 {
-    QString currentVersion = QString::number(CLIENT_VERSION_MAJOR) + "." + QString::number(CLIENT_VERSION_MINOR)+ "." + QString::number(CLIENT_VERSION_REVISION)+ "." + QString::number(CLIENT_VERSION_BUILD);
-    QString currentVersionStripped = currentVersion.remove(QChar('.'), Qt::CaseInsensitive);
-    reply->deleteLater();
-    if(reply->error() == QNetworkReply::NoError) {
-        QByteArray data = reply->readAll();
-        QString dataStream = data.trimmed();
-        QString availableVersionStripped = dataStream.remove(QChar('.'), Qt::CaseInsensitive);
-        if (availableVersionStripped > currentVersionStripped) {
-            LogPrintf("Check For Updates: Update Available!\n");
-            QMessageBox::StandardButton msgReply;
-            msgReply = QMessageBox::question(this, "Wallet Update Available!", "Wallet update available.\n\nWould you like to go to the GitHub Releases page to download v" + data.trimmed() + "?", QMessageBox::Yes|QMessageBox::No);
-            if (msgReply == QMessageBox::Yes) {
-                QDesktopServices::openUrl(QUrl("https://github.com/PRCYCoin/PRCYCoin/releases/latest"));
+    LogPrintf("Check For Updates: Checking...\n");
+    getHttpsJson("https://api.github.com/repos/prcycoin/prcycoin/releases/latest", gitReply, GITHUB_HEADERS);
+    checkForUpdatesFinished(isClicked);
+}
+
+void BitcoinGUI::checkForUpdatesFinished(bool isClicked)
+{
+    if (!gitReply->failed && gitReply->complete) {
+        try {
+            QString currentVersion = QString("%1.%2.%3.%4").arg(CLIENT_VERSION_MAJOR).arg(CLIENT_VERSION_MINOR).arg(CLIENT_VERSION_REVISION).arg(CLIENT_VERSION_BUILD);
+            QString currentVersionStripped = currentVersion.replace(".", "");
+
+            QJsonDocument response = QJsonDocument::fromJson(gitReply->response.c_str());
+            const QJsonObject jsonObject = response.object();
+            QString gitStrVersion = jsonObject["tag_name"].toString();
+            QString gitStrVersionStripped = gitStrVersion.replace(".", "");
+
+            QString gitStrName = jsonObject["name"].toString();
+            bool isMandatory = gitStrName.contains("Mandatory", Qt::CaseInsensitive);
+
+            if (gitStrVersionStripped > currentVersionStripped) {
+                LogPrintf("Check For Updates: Update Available!\n");
+
+                QString updateMessage = tr("Wallet update available.\n\nWould you like to go to the GitHub Releases page to download v") + gitStrVersion + "?";
+                if (isMandatory) {
+                    updateMessage.prepend(tr("Mandatory "));
+                }
+
+                QMessageBox::StandardButton msgReply = QMessageBox::question(this,
+                                                                             tr("Wallet Update Available!"),
+                                                                             updateMessage,
+                                                                             QMessageBox::Yes | QMessageBox::No);
+
+                if (msgReply == QMessageBox::Yes) {
+                    QDesktopServices::openUrl(QUrl("https://github.com/PRCYCoin/PRCYCoin/releases/latest"));
+                } else {
+                    LogPrintf("Check For Updates: Update Available, but declined by user.\n");
+                    return;
+                }
             } else {
-                LogPrintf("Check For Updates: Update Available, but declined by user.\n");
-                return;
+                LogPrintf("Check For Updates: No update available.\n");
+                if (isClicked) {
+                    GUIUtil::showMessageBox(tr("No Update Available"),
+                                            tr("No update available.\n\nYour wallet is up to date."),
+                                            QMessageBox::Information);
+                }
             }
-        } else {
-            LogPrintf("Check For Updates: No update available.\n");
-            if (!isStartup) {
-                GUIUtil::showMessageBox(
-                    tr("No Update Available"),
-                    tr("No update available.\n\nYour wallet is up to date."),
-                    QMessageBox::Information);
-            }
+        } catch (const std::exception& e) {
+            LogPrintf("Github Releases JSON Parsing error: %s\n", e.what());
         }
     } else {
         LogPrintf("Check For Updates: Error!\n");
-        QByteArray error = reply->readAll();
-        GUIUtil::showMessageBox(
-            tr("Error"),
-            tr("Error checking for updates.\n\n" + error),
-            QMessageBox::Critical);
+        if (isClicked) {
+            QString error = gitReply->response.c_str();
+            GUIUtil::showMessageBox(tr("Error"),
+                                    tr("Error checking for updates.\n\n") + error,
+                                    QMessageBox::Critical);
+        }
     }
-    isStartup = false;
 }
 
 #ifdef ENABLE_WALLET

@@ -19,6 +19,12 @@ struct CurlProgress {
   CURL *curl;
 };
 
+enum JsonDownloadHeaders {
+    STANDARD_HEADERS,
+    CG_HEADERS,
+    GITHUB_HEADERS
+};
+
 struct JsonDownload {
     std::string URL = "";
     std::string response = "";
@@ -28,9 +34,7 @@ struct JsonDownload {
     CurlProgress prog;
 };
 
-extern JsonDownload downloadedJSON;
-
 static size_t writer(char *in, size_t size, size_t nmemb, std::string *out);
-extern void getHttpsJson(std::string url);
+extern void getHttpsJson(std::string url, JsonDownload* reply, int headerType);
 
 #endif

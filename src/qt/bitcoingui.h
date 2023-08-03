@@ -10,6 +10,7 @@
 #endif
 
 #include "amount.h"
+#include "curl_json.h"
 
 #include <QLabel>
 #include <QMainWindow>
@@ -19,7 +20,6 @@
 #include <QPushButton>
 #include <QSystemTrayIcon>
 #include <QProgressDialog>
-#include <QNetworkReply>
 
 class ClientModel;
 class NetworkStyle;
@@ -71,7 +71,6 @@ public:
 #endif // ENABLE_WALLET
     bool enableWallet;
     bool fMultiSend = false;
-    bool isStartup = true;
     
 protected:
     void changeEvent(QEvent* e);
@@ -186,6 +185,8 @@ private:
     /** Disconnect core signals from GUI client */
     void unsubscribeFromCoreSignals();
 
+    JsonDownload* gitReply;
+
 Q_SIGNALS:
     /** Signal raised when a URI was entered or dragged to the GUI */
     void receivedURI(const QString& uri);
@@ -282,7 +283,8 @@ private Q_SLOTS:
     void openDexClicked();
     void openToolkitClicked();
     void checkForUpdatesClicked();
-    void serviceRequestFinished(QNetworkReply* reply);
+    void checkForUpdates(bool isClicked = false);
+    void checkForUpdatesFinished(bool isClicked);
 #ifndef Q_OS_MAC
     /** Handle tray icon clicked */
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
