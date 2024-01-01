@@ -1,9 +1,9 @@
 package=libcurl
-$(package)_version=8.4.0
+$(package)_version=8.5.0
 $(package)_dependencies=openssl
 $(package)_download_path=https://curl.haxx.se/download
 $(package)_file_name=curl-$($(package)_version).tar.xz
-$(package)_sha256_hash=16c62a9c4af0f703d28bda6d7bbf37ba47055ad3414d70dec63e2e6336f2a82d
+$(package)_sha256_hash=42ab8db9e20d8290a3b633e7fbb3cec15db34df65fd1015ef8ac1e4723750eeb
 $(package)_config_opts=--disable-shared --enable-static --prefix=$(host_prefix) --host=$(HOST) --with-openssl
 $(package)_config_opts+=--disable-manual --disable-ntlm-wb --with-random=/dev/urandom
 $(package)_config_opts+=--disable-curldebug --disable-libcurl-option --disable-ldap --disable-ldaps
