@@ -31,6 +31,7 @@
 #include "miner.h"
 #include "netbase.h"
 #include "net.h"
+#include "rpc/blockchain.h"
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "script/sigcache.h"
@@ -442,6 +443,7 @@ std::string HelpMessage(HelpMessageMode mode)
                 CURRENCY_UNIT, FormatMoney(CWallet::minTxFee.GetFeePerK())));
     strUsage += HelpMessageOpt("-paytxfee=<amt>", strprintf(_("Fee (in %s/kB) to add to transactions you send (default: %s)"), CURRENCY_UNIT, FormatMoney(payTxFee.GetFeePerK())));
     strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions") + " " + _("on startup"));
+    strUsage += HelpMessageOpt("-rescanheight", _("Rescan the block chain from the specified height when rescan=1 on startup"));
     strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet.dat") + " " + _("on startup"));
     strUsage += HelpMessageOpt("-sendfreetransactions", strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"), 0));
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), 1));
@@ -554,6 +556,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-rpcbind=<addr>", _("Bind to given address to listen for JSON-RPC connections. Use [host]:port notation for IPv6. This option can be specified multiple times (default: bind to all interfaces)"));
     strUsage += HelpMessageOpt("-rpcuser=<user>", _("Username for JSON-RPC connections"));
     strUsage += HelpMessageOpt("-rpcpassword=<pw>", _("Password for JSON-RPC connections"));
+    strUsage += HelpMessageOpt("-rpcauth=<userpw>", _("Username and hashed password for JSON-RPC connections. The field <userpw> comes in the format: <USERNAME>:<SALT>$<HASH>. A canonical python script is included in share/rpcuser. This option can be specified multiple times"));
     strUsage += HelpMessageOpt("-rpcport=<port>", strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"), 59683, 59685));
     strUsage += HelpMessageOpt("-rpcallowip=<ip>", _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be specified multiple times"));
     strUsage += HelpMessageOpt("-rpcthreads=<n>", strprintf(_("Set the number of threads to service RPC calls (default: %d)"), DEFAULT_HTTP_THREADS));
@@ -774,16 +777,7 @@ bool AppInitBasicSetup()
 #endif
 #ifdef WIN32
 // Enable Data Execution Prevention (DEP)
-// Minimum supported OS versions: WinXP SP3, WinVista >= SP1, Win Server 2008
-// A failure is non-critical and needs no further attention!
-#ifndef PROCESS_DEP_ENABLE
-// We define this here, because GCCs winbase.h limits this to _WIN32_WINNT >= 0x0601 (Windows 7),
-// which is not correct. Can be removed, when GCCs winbase.h is fixed!
-#define PROCESS_DEP_ENABLE 0x00000001
-#endif
-    typedef BOOL(WINAPI * PSETPROCDEPPOL)(DWORD);
-    PSETPROCDEPPOL setProcDEPPol = (PSETPROCDEPPOL)GetProcAddress(GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
-    if (setProcDEPPol != NULL) setProcDEPPol(PROCESS_DEP_ENABLE);
+    SetProcessDEPPolicy(PROCESS_DEP_ENABLE);
 #endif
 
     if (!SetupNetworking())
@@ -908,7 +902,7 @@ void InitLogging()
 #else
     version_string += " (release build)";
 #endif
-    LogPrintf("PRCY version %s (%s)\n", version_string, CLIENT_DATE);
+    LogPrintf("PRCY version %s\n", version_string);
 }
 
 /** Initialize prcy.
@@ -1492,7 +1486,7 @@ bool AppInit2(bool isDaemon)
                     }
 
                     //Must check at level 4
-                    if (!CVerifyDB().VerifyDB(pcoinsdbview, 4, GetArg("-checkblocks", 100))) {
+                    if (!CVerifyDB().VerifyDB(pcoinsdbview, 4, GetArg("-checkblocks", 10))) {
                         strLoadError = _("Corrupted block database detected");
                         fVerifyingBlocks = false;
                         break;
@@ -1682,7 +1676,7 @@ bool AppInit2(bool isDaemon)
             //Sort Transactions by block and block index, then reorder
             LOCK2(cs_main, pwalletMain->cs_wallet);
             if (chainActive.Tip()) {
-                LogPrintf("Runnning transaction reorder\n");
+                LogPrintf("Running transaction reorder\n");
                 int64_t maxOrderPos = 0;
                 std::map<std::pair<int,int>, CWalletTx*> mapSorted;
                 pwalletMain->ReorderWalletTransactions(mapSorted, maxOrderPos);
@@ -1692,6 +1686,15 @@ bool AppInit2(bool isDaemon)
 
         if (GetBoolArg("-rescan", false)) {
             pindexRescan = chainActive.Genesis();
+
+            int rescanHeight = GetArg("-rescanheight", 0);
+            if (rescanHeight > 0) {
+                if (rescanHeight > chainActive.Tip()->nHeight) {
+                    pindexRescan = chainActive.Tip();
+                } else {
+                    pindexRescan = chainActive[rescanHeight];
+                }
+            }
         } else {
             CWalletDB walletdb(strWalletFile);
             CBlockLocator locator;

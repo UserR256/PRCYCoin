@@ -16,15 +16,11 @@ Then install [Homebrew](https://brew.sh).
 Dependencies
 ----------------------
 
-    brew install autoconf automake berkeley-db4 libtool boost miniupnpc openssl pkg-config protobuf python3 qt5 zmq libevent qrencode
+    brew install autoconf automake berkeley-db4 libtool boost miniupnpc openssl pkg-config python3 qt5 zmq libevent qrencode
 
 See [dependencies.md](dependencies.md) for a complete overview.
 
-If you want to build the disk image with `make deploy` (.dmg / optional), you need RSVG:
-
-    brew install librsvg
-
-and [`macdeployqtplus`](../contrib/macdeploy/README.md) dependencies:
+[`macdeployqtplus`](../contrib/macdeploy/README.md) dependencies:
 ```shell
 pip3 install ds_store mac_alias
 ```
@@ -110,7 +106,7 @@ Other commands:
 Notes
 -----
 
-* Tested on OS X 10.12 Sierra through macOS 10.15 Catalina on 64-bit Intel processors only.
+* Tested on OS X 10.14 Mojave through macOS 11 Big Sur on 64-bit Intel
 
 * Building with downloaded Qt binaries is not officially supported. See the notes in [#7714](https://github.com/bitcoin/bitcoin/issues/7714)
 

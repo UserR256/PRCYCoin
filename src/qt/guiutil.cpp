@@ -21,15 +21,6 @@
 #include "util.h"
 
 #ifdef WIN32
-#ifdef _WIN32_WINNT
-#undef _WIN32_WINNT
-#endif
-#define _WIN32_WINNT 0x0501
-#ifdef _WIN32_IE
-#undef _WIN32_IE
-#endif
-#define _WIN32_IE 0x0501
-#define WIN32_LEAN_AND_MEAN 1
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -50,6 +41,7 @@
 #include <QDoubleValidator>
 #include <QFileDialog>
 #include <QFont>
+#include <QFontDatabase>
 #include <QLineEdit>
 #include <QObject>
 #include <QSettings>
@@ -88,9 +80,7 @@ QString dateTimeStr(qint64 nTime)
 
 QFont bitcoinAddressFont()
 {
-    QFont font("Monospace");
-    font.setStyleHint(QFont::Monospace);
-    return font;
+    return QFontDatabase::systemFont(QFontDatabase::FixedFont);
 }
 
 void setupAddressWidget(QValidatedLineEdit* widget, QWidget* parent)
@@ -768,13 +758,22 @@ void setWindowless(QWidget* widget){
 void disableTooltips(QWidget* widget){
 }
 
-void prompt(QString message){
-    QMessageBox* errorPrompt = new QMessageBox();
-    GUIUtil::setWindowless(errorPrompt);
-    errorPrompt->setStyleSheet(GUIUtil::loadStyleSheet());
-    errorPrompt->setText(message);
-    errorPrompt->exec();
-    errorPrompt->deleteLater();
+void showMessageBox(const QString& title, const QString& message, QMessageBox::Icon icon) {
+    showMessageBox("", title, message, icon);
+}
+
+void showMessageBox(const QString& objectName, const QString& title, const QString& message, QMessageBox::Icon icon) {
+    QMessageBox* messageBox = new QMessageBox();
+    if (!objectName.isEmpty()) {
+        messageBox->setObjectName(objectName);
+    }
+    //GUIUtil::setWindowless(messageBox);
+    messageBox->setStyleSheet(GUIUtil::loadStyleSheet());
+    messageBox->setText(message);
+    messageBox->setIcon(icon);
+    messageBox->setWindowTitle(title);
+    messageBox->exec();
+    messageBox->deleteLater();
 }
 
 void colorCalendarWidgetWeekends(QCalendarWidget* widget, QColor color)

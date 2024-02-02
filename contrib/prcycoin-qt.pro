@@ -86,6 +86,7 @@ HEADERS += src/activemasternode.h \
            src/compressor.h \
            src/core_io.h \
            src/cuckoocache.h \
+           src/curl_json.h \
            src/crypter.h \
            src/eccryptoverify.h \
            src/ecdhutil.h \
@@ -215,7 +216,6 @@ HEADERS += src/activemasternode.h \
            src/qt/optionsmodel.h \
            src/qt/optionspage.h \
            src/qt/overviewpage.h \
-           src/qt/paymentrequestplus.h \
            src/qt/paymentserver.h \
            src/qt/peertablemodel.h \
            src/qt/qgoogleauth.h \
@@ -413,6 +413,7 @@ SOURCES += src/activemasternode.cpp \
            src/compressor.cpp \
            src/core_read.cpp \
            src/core_write.cpp \
+           src/curl_json.cpp \
            src/crypter.cpp \
            src/prcycoin-cli.cpp \
            src/prcycoin-tx.cpp \
@@ -543,7 +544,6 @@ SOURCES += src/activemasternode.cpp \
            src/qt/optionsmodel.cpp \
            src/qt/optionspage.cpp \
            src/qt/overviewpage.cpp \
-           src/qt/paymentrequestplus.cpp \
            src/qt/paymentserver.cpp \
            src/qt/peertablemodel.cpp \
            src/qt/qgoogleauth.cpp \

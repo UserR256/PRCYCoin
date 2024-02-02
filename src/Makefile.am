@@ -2,9 +2,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+# Pattern rule to print variables, e.g. make print-top_srcdir
+print-%:
+	@echo '$*' = '$($*)'
+
 DIST_SUBDIRS = secp256k1 secp256k1-mw univalue
-AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS) $(GPROF_LDFLAGS) $(SANITIZER_LDFLAGS)
-AM_CXXFLAGS = $(DEBUG_CXXFLAGS) $(HARDENED_CXXFLAGS) $(WARN_CXXFLAGS) $(NOWARN_CXXFLAGS) $(ERROR_CXXFLAGS) $(GPROF_CXXFLAGS) $(SANITIZER_CXXFLAGS)
+AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS) $(GPROF_LDFLAGS) $(SANITIZER_LDFLAGS) $(LTO_LDFLAGS)
+AM_CXXFLAGS = $(DEBUG_CXXFLAGS) $(HARDENED_CXXFLAGS) $(WARN_CXXFLAGS) $(NOWARN_CXXFLAGS) $(ERROR_CXXFLAGS) $(GPROF_CXXFLAGS) $(SANITIZER_CXXFLAGS) $(LTO_CXXFLAGS)
 AM_CPPFLAGS = $(DEBUG_CPPFLAGS) $(HARDENED_CPPFLAGS)
 AM_LIBTOOLFLAGS = --preserve-dup-deps
 EXTRA_LIBRARIES =
@@ -18,7 +22,7 @@ else
 LIBUNIVALUE = $(UNIVALUE_LIBS)
 endif
 
-BITCOIN_INCLUDES=-I$(builddir) $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
+BITCOIN_INCLUDES=-I$(builddir) $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS) $(CURL_CFLAGS) 
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1-mw/include
@@ -117,6 +121,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   cuckoocache.h \
   crypter.h \
+  curl_json.h \
   wallet/db.h \
   fs.h \
   eccryptoverify.h \
@@ -157,6 +162,7 @@ BITCOIN_CORE_H = \
   random.h \
   reverselock.h \
   reverse_iterate.h \
+  rpc/blockchain.h \
   rpc/client.h \
   rpc/protocol.h \
   rpc/server.h \
@@ -171,6 +177,7 @@ BITCOIN_CORE_H = \
   stakeinput.h \
   streams.h \
   support/cleanse.h \
+  support/events.h \
   sync.h \
   threadsafety.h \
   timedata.h \
@@ -207,7 +214,7 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 # server: shared between prcycoind and prcycoin-qt
-libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS) $(CURL_CFLAGS) 
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrman.cpp \
@@ -216,6 +223,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   consensus/tx_verify.cpp \
+  curl_json.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -448,7 +456,7 @@ prcycoind_LDADD = \
   $(LIBSECP256K1) \
   $(LIBSECP256K1_2)
 
-prcycoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+prcycoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(CURL_LIBS) 
 
 # prcycoin-cli binary #
 prcycoin_cli_SOURCES = prcycoin-cli.cpp
@@ -583,14 +591,8 @@ if HARDEN
 	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
 endif
 
-%.pb.cc %.pb.h: %.proto
-	@test -f $(PROTOC)
-	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(<D) $<
-
-if EMBEDDED_LEVELDB
 include Makefile.crc32c.include
 include Makefile.leveldb.include
-endif
 
 if ENABLE_TESTS
 include Makefile.test.include

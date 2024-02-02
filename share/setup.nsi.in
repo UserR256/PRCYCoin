@@ -2,6 +2,12 @@ Name "@PACKAGE_NAME@ (64-bit)"
 
 RequestExecutionLevel highest
 SetCompressor /SOLID lzma
+SetDateSave off
+Unicode true
+
+# Uncomment these lines when investigating reproducibility errors
+#SetCompress off
+#SetDatablockOptimize off
 
 # General Symbol Definitions
 !define REGKEY "SOFTWARE\$(^Name)"
@@ -19,7 +25,8 @@ SetCompressor /SOLID lzma
 !define MUI_STARTMENUPAGE_REGISTRY_KEY ${REGKEY}
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME StartMenuGroup
 !define MUI_STARTMENUPAGE_DEFAULTFOLDER "@PACKAGE_NAME@"
-!define MUI_FINISHPAGE_RUN $INSTDIR\@BITCOIN_GUI_NAME@@EXEEXT@
+!define MUI_FINISHPAGE_RUN "$WINDIR\explorer.exe"
+!define MUI_FINISHPAGE_RUN_PARAMETERS $INSTDIR\@BITCOIN_GUI_NAME@@EXEEXT@
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-wizard.bmp"
 !define MUI_UNFINISHPAGE_NOAUTOCLOSE
@@ -47,7 +54,7 @@ Var StartMenuGroup
 # Installer attributes
 OutFile @abs_top_srcdir@/@PACKAGE_TARNAME@-@PACKAGE_VERSION@-win64-setup-unsigned.exe
 InstallDir $PROGRAMFILES64\PRCYcoin
-CRCCheck on
+CRCCheck force
 XPStyle on
 BrandingText " "
 ShowInstDetails show
@@ -66,13 +73,13 @@ ShowUninstDetails show
 Section -Main SEC0000
     SetOutPath $INSTDIR
     SetOverwrite on
-    File @abs_top_srcdir@/release/@BITCOIN_GUI_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@BITCOIN_GUI_NAME@@EXEEXT@
     File /oname=COPYING.txt @abs_top_srcdir@/COPYING
     File /oname=readme.txt @abs_top_srcdir@/doc/README_windows.txt
     SetOutPath $INSTDIR\daemon
-    File @abs_top_srcdir@/release/@BITCOIN_DAEMON_NAME@@EXEEXT@
-    File @abs_top_srcdir@/release/@BITCOIN_CLI_NAME@@EXEEXT@
-    File @abs_top_srcdir@/release/@BITCOIN_TX_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@BITCOIN_DAEMON_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@BITCOIN_CLI_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@BITCOIN_TX_NAME@@EXEEXT@
     SetOutPath $INSTDIR\doc
     File /r /x Makefile* @abs_top_srcdir@/doc\*.*
     SetOutPath $INSTDIR

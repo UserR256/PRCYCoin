@@ -7,7 +7,6 @@
 #define BITCOIN_VALIDATIONINTERFACE_H
 
 #include <boost/signals2/signal.hpp>
-#include <boost/shared_ptr.hpp>
 
 class CBlock;
 struct CBlockLocator;
@@ -33,6 +32,7 @@ class CValidationInterface {
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
     virtual void SyncTransaction(const CTransaction &tx, const CBlock *pblock) {}
+    virtual bool EraseFromWallet(const uint256 &hash) { return false;}
     virtual void NotifyTransactionLock(const CTransaction &tx) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual bool UpdatedTransaction(const uint256 &hash) { return false;}
@@ -40,7 +40,7 @@ protected:
 // XX42    virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void ResendWalletTransactions() {}
     virtual void BlockChecked(const CBlock&, const CValidationState&) {}
-// XX42    virtual void GetScriptForMining(boost::shared_ptr<CReserveScript>&) {};
+// XX42    virtual void GetScriptForMining(std::shared_ptr<CReserveScript>&) {};
     virtual void ResetRequestCount(const uint256 &hash) {};
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
@@ -66,7 +66,7 @@ struct CMainSignals {
     /** Notifies listeners of a block validation result */
     boost::signals2::signal<void (const CBlock&, const CValidationState&)> BlockChecked;
     /** Notifies listeners that a key for mining is required (coinbase) */
-// XX42    boost::signals2::signal<void (boost::shared_ptr<CReserveScript>&)> ScriptForMining;
+// XX42    boost::signals2::signal<void (std::shared_ptr<CReserveScript>&)> ScriptForMining;
     /** Notifies listeners that a block has been successfully mined */
     boost::signals2::signal<void (const uint256 &)> BlockFound;
 };

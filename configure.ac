@@ -6,12 +6,18 @@ define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 6)
 define(_CLIENT_VERSION_RC, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
-define(_COPYRIGHT_YEAR, 2023)
+define(_COPYRIGHT_YEAR, 2024)
 AC_INIT([PRCYcoin],m4_join([.], _CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MINOR, _CLIENT_VERSION_REVISION, m4_if(_CLIENT_VERSION_BUILD, [0], [], _CLIENT_VERSION_BUILD))m4_if(_CLIENT_VERSION_RC, [0], [], [rc]_CLIENT_VERSION_RC),[https://github.com/PRCYCoin/PRCYCoin/issues],[prcycoin],[https://www.prcycoin.com])
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([src/config/prcycoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
+
+m4_ifndef([PKG_PROG_PKG_CONFIG], [m4_fatal([PKG_PROG_PKG_CONFIG macro not found. Please install pkg-config and re-run autogen.sh])])
+PKG_PROG_PKG_CONFIG
+if test "x$PKG_CONFIG" = x; then
+  AC_MSG_ERROR([pkg-config not found])
+fi
 
 BITCOIN_DAEMON_NAME=prcycoind
 BITCOIN_GUI_NAME=prcycoin-qt
@@ -34,14 +40,14 @@ dnl faketime breaks configure and is only needed for make. Disable it here.
 unset FAKETIME
 
 dnl Automake init set-up and checks
-AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
+AM_INIT_AUTOMAKE([1.13 no-define subdir-objects foreign])
 
 dnl faketime messes with timestamps and causes configure to be re-run.
 dnl --disable-maintainer-mode can be used to bypass this.
 AM_MAINTAINER_MODE([enable])
 
 dnl make the compilation flags quiet unless V=1 is used
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+AM_SILENT_RULES([yes])
 
 dnl Compiler checks (here before libtool).
 if test "x${CXXFLAGS+set}" = "xset"; then
@@ -60,6 +66,9 @@ case $host in
   ;;
 esac
 
+dnl Require C++17 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
+
 dnl Check if -latomic is required for <std::atomic>
 CHECK_ATOMIC
 
@@ -77,12 +86,10 @@ LT_INIT([pic-only])
 
 dnl Check/return PATH for base programs.
 AC_PATH_TOOL(AR, ar)
-AC_PATH_TOOL(RANLIB, ranlib)
-AC_PATH_TOOL(STRIP, strip)
 AC_PATH_TOOL(GCOV, gcov)
 AC_PATH_PROG(LCOV, lcov)
-dnl Python 3.x is supported from 3.4 on (see https://github.com/bitcoin/bitcoin/issues/7893)
-AC_PATH_PROGS([PYTHON], [python3.7 python3.6 python3.5 python3.4 python3 python])
+dnl Python 3.6 is specified in .python-version and should be used if available, see doc/dependencies.md
+AC_PATH_PROGS([PYTHON], [python3.6 python3.7 python3.8 python3.9 python3 python])
 AC_PATH_PROG(GENHTML, genhtml)
 AC_PATH_PROG([GIT], [git])
 AC_PATH_PROG(CCACHE,ccache)
@@ -208,8 +215,6 @@ AC_ARG_ENABLE([zmq],
   [use_zmq=$enableval],
   [use_zmq=yes])
 
-AC_ARG_WITH([protoc-bindir],[AS_HELP_STRING([--with-protoc-bindir=BIN_DIR],[specify protoc bin path])], [protoc_bin_path=$withval], [])
-
 AC_ARG_ENABLE(man,
     [AS_HELP_STRING([--disable-man],
                     [do not install man pages (default is to install)])],,
@@ -243,6 +248,11 @@ AC_ARG_ENABLE([werror],
     [enable_werror=$enableval],
     [enable_werror=no])
 
+AC_ARG_ENABLE([lto],
+    [AS_HELP_STRING([--enable-lto],[build using LTO (default is no)])],
+    [enable_lto=$enableval],
+    [enable_lto=no])
+
 AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
 
@@ -268,6 +278,11 @@ if test "x$enable_debug" = xyes; then
   AX_CHECK_PREPROC_FLAG([-DDEBUG],[[DEBUG_CPPFLAGS="$DEBUG_CPPFLAGS -DDEBUG"]],,[[$CXXFLAG_WERROR]])
   AX_CHECK_PREPROC_FLAG([-DDEBUG_LOCKORDER],[[DEBUG_CPPFLAGS="$DEBUG_CPPFLAGS -DDEBUG_LOCKORDER"]],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-ftrapv],[DEBUG_CXXFLAGS="$DEBUG_CXXFLAGS -ftrapv"],,[[$CXXFLAG_WERROR]])
+fi
+
+if test "x$enable_lto" = "xyes"; then
+  AX_CHECK_COMPILE_FLAG([-flto], [LTO_CXXFLAGS="$LTO_CXXFLAGS -flto"], [AC_MSG_ERROR([compile failed with -flto])], [$CXXFLAG_WERROR])
+  AX_CHECK_LINK_FLAG([-flto], [LTO_LDFLAGS="$LTO_LDFLAGS -flto"], [AC_MSG_ERROR([link failed with -flto])], [$CXXFLAG_WERROR])
 fi
 
 if test x$use_sanitizers != x; then
@@ -317,6 +332,7 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wunused-local-typedef],[NOWARN_CXXFLAGS="$NOWARN_CXXFLAGS -Wno-unused-local-typedef"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wdeprecated-register],[NOWARN_CXXFLAGS="$NOWARN_CXXFLAGS -Wno-deprecated-register"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough],[NOWARN_CXXFLAGS="$NOWARN_CXXFLAGS -Wno-implicit-fallthrough"],,[[$CXXFLAG_WERROR]])
+  AX_CHECK_COMPILE_FLAG([-Wdeprecated-copy],[NOWARN_CXXFLAGS="$NOWARN_CXXFLAGS -Wno-deprecated-copy"],,[[$CXXFLAG_WERROR]])
 fi
 
 enable_sse42=no
@@ -445,33 +461,23 @@ AC_ARG_WITH([daemon],
   [build_bitcoind=$withval],
   [build_bitcoind=yes])
 
-use_pkgconfig=yes
 case $host in
   *mingw*)
-
-     #pkgconfig does more harm than good with MinGW
-     use_pkgconfig=no
-
      TARGET_OS=windows
-     AC_CHECK_LIB([mingwthrd],      [main],, AC_MSG_ERROR(libmingwthrd missing))
-     AC_CHECK_LIB([kernel32],      [main],, AC_MSG_ERROR(libkernel32 missing))
-     AC_CHECK_LIB([user32],      [main],, AC_MSG_ERROR(libuser32 missing))
-     AC_CHECK_LIB([gdi32],      [main],, AC_MSG_ERROR(libgdi32 missing))
-     AC_CHECK_LIB([comdlg32],      [main],, AC_MSG_ERROR(libcomdlg32 missing))
-     AC_CHECK_LIB([winspool],      [main],, AC_MSG_ERROR(libwinspool missing))
-     AC_CHECK_LIB([winmm],      [main],, AC_MSG_ERROR(libwinmm missing))
-     AC_CHECK_LIB([shell32],      [main],, AC_MSG_ERROR(libshell32 missing))
-     AC_CHECK_LIB([comctl32],      [main],, AC_MSG_ERROR(libcomctl32 missing))
-     AC_CHECK_LIB([ole32],      [main],, AC_MSG_ERROR(libole32 missing))
-     AC_CHECK_LIB([oleaut32],      [main],, AC_MSG_ERROR(liboleaut32 missing))
-     AC_CHECK_LIB([uuid],      [main],, AC_MSG_ERROR(libuuid missing))
-     AC_CHECK_LIB([rpcrt4],      [main],, AC_MSG_ERROR(librpcrt4 missing))
-     AC_CHECK_LIB([advapi32],      [main],, AC_MSG_ERROR(libadvapi32 missing))
-     AC_CHECK_LIB([ws2_32],      [main],, AC_MSG_ERROR(libws2_32 missing))
-     AC_CHECK_LIB([mswsock],      [main],, AC_MSG_ERROR(libmswsock missing))
-     AC_CHECK_LIB([shlwapi],      [main],, AC_MSG_ERROR(libshlwapi missing))
-     AC_CHECK_LIB([iphlpapi],      [main],, AC_MSG_ERROR(libiphlpapi missing))
-     AC_CHECK_LIB([crypt32],      [main],, AC_MSG_ERROR(libcrypt32 missing))
+     AC_CHECK_LIB([kernel32], [GetModuleFileNameA],, AC_MSG_ERROR(libkernel32 missing))
+     AC_CHECK_LIB([user32],   [main],, AC_MSG_ERROR(libuser32 missing))
+     AC_CHECK_LIB([gdi32],    [main],, AC_MSG_ERROR(libgdi32 missing))
+     AC_CHECK_LIB([comdlg32], [main],, AC_MSG_ERROR(libcomdlg32 missing))
+     AC_CHECK_LIB([winmm],    [main],, AC_MSG_ERROR(libwinmm missing))
+     AC_CHECK_LIB([shell32],  [SHGetSpecialFolderPathW],, AC_MSG_ERROR(libshell32 missing))
+     AC_CHECK_LIB([comctl32], [main],, AC_MSG_ERROR(libcomctl32 missing))
+     AC_CHECK_LIB([ole32],    [CoCreateInstance],, AC_MSG_ERROR(libole32 missing))
+     AC_CHECK_LIB([oleaut32], [main],, AC_MSG_ERROR(liboleaut32 missing))
+     AC_CHECK_LIB([uuid],     [main],, AC_MSG_ERROR(libuuid missing))
+     AC_CHECK_LIB([advapi32], [CryptAcquireContextW],, AC_MSG_ERROR(libadvapi32 missing))
+     AC_CHECK_LIB([ws2_32],   [WSAStartup],, AC_MSG_ERROR(libws2_32 missing))
+     AC_CHECK_LIB([shlwapi],  [PathRemoveFileSpecW],, AC_MSG_ERROR(libshlwapi missing))
+     AC_CHECK_LIB([iphlpapi], [GetAdaptersAddresses],, AC_MSG_ERROR(libiphlpapi missing))
 
      # -static is interpreted by libtool, where it has a different meaning.
      # In libtool-speak, it's -all-static.
@@ -487,7 +493,7 @@ case $host in
        AC_MSG_ERROR("windres not found")
      fi
 
-     CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB"
+     CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -D_WIN32_WINNT=0x0601 -D_WIN32_IE=0x0501 -DWIN32_LEAN_AND_MEAN"
      LEVELDB_TARGET_FLAGS="-DOS_WINDOWS"
      if test "x$CXXFLAGS_overridden" = "xno"; then
        CXXFLAGS="$CXXFLAGS -w"
@@ -507,7 +513,6 @@ case $host in
      LEVELDB_TARGET_FLAGS="-DOS_MACOSX"
      if  test x$cross_compiling != xyes; then
        BUILD_OS=darwin
-       AC_PATH_PROGS([RSVG_CONVERT], [rsvg-convert rsvg],rsvg-convert)
        AC_CHECK_PROG([BREW],brew, brew)
        if test x$BREW = xbrew; then
          dnl These Homebrew packages may be keg-only, meaning that they won't be found
@@ -538,12 +543,9 @@ case $host in
            BUILD_OS=darwin
            ;;
          *)
-           AC_PATH_TOOL([INSTALLNAMETOOL], [install_name_tool], install_name_tool)
+           AC_PATH_TOOL([INSTALL_NAME_TOOL], [install_name_tool], install_name_tool)
            AC_PATH_TOOL([OTOOL], [otool], otool)
-           AC_PATH_PROGS([GENISOIMAGE], [genisoimage mkisofs],genisoimage)
-           AC_PATH_PROGS([RSVG_CONVERT], [rsvg-convert rsvg],rsvg-convert)
-           AC_PATH_PROGS([IMAGEMAGICK_CONVERT], [convert],convert)
-           AC_PATH_PROGS([TIFFCP], [tiffcp],tiffcp)
+           AC_PATH_PROGS([XORRISOFS], [xorrisofs], xorrisofs)
 
            dnl libtool will try to strip the static lib, which is a problem for
            dnl cross-builds because strip attempts to call a hard-coded ld,
@@ -561,21 +563,26 @@ case $host in
    *android*)
      dnl make sure android stays above linux for hosts like *linux-android*
      TARGET_OS=android
+     case $host in
+       *x86_64*)
+          ANDROID_ARCH=x86_64
+          ;;
+        *aarch64*)
+          ANDROID_ARCH=arm64-v8a
+          ;;
+        *armv7a*)
+          ANDROID_ARCH=armeabi-v7a
+          ;;
+        *i686*)
+          ANDROID_ARCH=i686
+          ;;
+        *) AC_MSG_ERROR("Could not determine Android arch") ;;
+      esac
      ;;
    *linux*)
      TARGET_OS=linux
      ;;
 esac
-
-if test x$use_pkgconfig = xyes; then
-  m4_ifndef([PKG_PROG_PKG_CONFIG], [AC_MSG_ERROR(PKG_PROG_PKG_CONFIG macro not found. Please install pkg-config and re-run autogen.sh.)])
-  m4_ifdef([PKG_PROG_PKG_CONFIG], [
-  PKG_PROG_PKG_CONFIG
-  if test x"$PKG_CONFIG" = "x"; then
-    AC_MSG_ERROR(pkg-config not found.)
-  fi
-  ])
-fi
 
 if test x$use_extended_functional_tests != xno; then
   AC_SUBST(EXTENDED_FUNCTIONAL_TESTS, --extended)
@@ -696,6 +703,7 @@ fi
 dnl this flag screws up non-darwin gcc even when the check fails. special-case it.
 if test x$TARGET_OS = xdarwin; then
   AX_CHECK_LINK_FLAG([[-Wl,-dead_strip]], [LDFLAGS="$LDFLAGS -Wl,-dead_strip"])
+  AX_CHECK_LINK_FLAG([[-Wl,-dead_strip_dylibs]], [LDFLAGS="$LDFLAGS -Wl,-dead_strip_dylibs"])
 fi
 
 AC_CHECK_HEADERS([endian.h sys/endian.h byteswap.h stdio.h stdlib.h unistd.h strings.h sys/types.h sys/stat.h sys/select.h sys/prctl.h])
@@ -902,14 +910,6 @@ if test x$use_reduce_exports = xyes; then
   [AC_MSG_ERROR([Cannot set default symbol visibility. Use --disable-reduce-exports.])])
 fi
 
-LEVELDB_CPPFLAGS=
-LIBLEVELDB=
-LIBMEMENV=
-AM_CONDITIONAL([EMBEDDED_LEVELDB],[true])
-AC_SUBST(LEVELDB_CPPFLAGS)
-AC_SUBST(LIBLEVELDB)
-AC_SUBST(LIBMEMENV)
-
 if test x$enable_wallet != xno; then
     dnl Check for libdb_cxx only if wallet enabled
     BITCOIN_FIND_BDB48
@@ -927,7 +927,7 @@ fi
 BITCOIN_QT_INIT
 
 dnl sets $bitcoin_enable_qt, $bitcoin_enable_qt_test, $bitcoin_enable_qt_dbus
-BITCOIN_QT_CONFIGURE([$use_pkgconfig], [qt5])
+BITCOIN_QT_CONFIGURE([5.5.1])
 
 if test x$build_bitcoin_utils$build_bitcoind$bitcoin_enable_qt$use_tests$use_bench = xnonononono; then
     use_boost=no
@@ -937,11 +937,8 @@ fi
 
 if test x$use_boost = xyes; then
 
-dnl Minimum required Boost version
-define(MINIMUM_REQUIRED_BOOST, 1.57.0)
-
-dnl Check for boost libs
-AX_BOOST_BASE([MINIMUM_REQUIRED_BOOST])
+dnl Check for Boost headers
+AX_BOOST_BASE([1.64.0],[],[AC_MSG_ERROR([Boost is not available!])])
 if test x$want_boost = xno; then
     AC_MSG_ERROR([[only libbitcoinconsensus can be built without boost]])
 fi
@@ -950,11 +947,6 @@ AX_BOOST_FILESYSTEM
 AX_BOOST_PROGRAM_OPTIONS
 AX_BOOST_THREAD
 AX_BOOST_CHRONO
-
-dnl Boost 1.56 through 1.62 allow using std::atomic instead of its own atomic
-dnl counter implementations. In 1.63 and later the std::atomic approach is default.
-m4_pattern_allow(DBOOST_AC_USE_STD_ATOMIC) dnl otherwise it's treated like a macro
-BOOST_CPPFLAGS="-DBOOST_SP_USE_STD_ATOMIC -DBOOST_AC_USE_STD_ATOMIC $BOOST_CPPFLAGS"
 fi
 
 if test x$use_reduce_exports = xyes; then
@@ -998,79 +990,30 @@ if test x$use_boost = xyes; then
 BOOST_LIBS="$BOOST_LDFLAGS $BOOST_SYSTEM_LIB $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB"
 fi
 
-if test x$use_pkgconfig = xyes; then
-  : dnl
-  m4_ifdef(
-    [PKG_CHECK_MODULES],
-    [
-      PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
-      PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
-      BITCOIN_QT_CHECK([PKG_CHECK_MODULES([PROTOBUF], [protobuf], [have_protobuf=yes], [BITCOIN_QT_FAIL(libprotobuf not found)])])
-      if test x$use_qr != xno; then
-        BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
-      fi
-      if test x$build_bitcoin_utils$build_bitcoind$bitcoin_enable_qt$use_tests != xnononono; then
-        PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
-        if test x$TARGET_OS != xwindows; then
-          PKG_CHECK_MODULES([EVENT_PTHREADS], [libevent_pthreads],, [AC_MSG_ERROR(libevent_pthreads not found.)])
-        fi
-      fi
+AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
+AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
 
-      if test "x$use_zmq" = "xyes"; then
-        PKG_CHECK_MODULES([ZMQ],[libzmq >= 4],
-          [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
-          [AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-           AC_MSG_WARN([libzmq version 4.x or greater not found, disabling])
-           use_zmq=no])
-      else
-          AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-      fi
-    ]
-  )
-else
-  AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
-  AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
+AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
+AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
 
-  AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
-  AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
-
-  if test x$build_bitcoin_utils$build_bitcoind$bitcoin_enable_qt$use_tests != xnononono; then
-    AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-    AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
-    if test x$TARGET_OS != xwindows; then
-      AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-    fi
-  fi
-
-  if test "x$use_zmq" = "xyes"; then
-     AC_CHECK_HEADER([zmq.h],
-       [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
-       [AC_MSG_WARN([zmq.h not found, disabling zmq support])
-        use_zmq=no
-        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
-     AC_CHECK_LIB([zmq],[zmq_ctx_shutdown],ZMQ_LIBS=-lzmq,
-       [AC_MSG_WARN([libzmq >= 4.0 not found, disabling zmq support])
-        use_zmq=no
-        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
-  else
-    AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-  fi
-
-  if test "x$use_zmq" = "xyes"; then
-    dnl Assume libzmq was built for static linking
-    case $host in
-      *mingw*)
-        ZMQ_CFLAGS="$ZMQ_CFLAGS -DZMQ_STATIC"
-      ;;
-    esac
-  fi
-
-  BITCOIN_QT_CHECK(AC_CHECK_LIB([protobuf] ,[main],[PROTOBUF_LIBS=-lprotobuf], BITCOIN_QT_FAIL(libprotobuf not found)))
-  if test x$use_qr != xno; then
-    BITCOIN_QT_CHECK([AC_CHECK_LIB([qrencode], [main],[QR_LIBS=-lqrencode], [have_qrencode=no])])
-    BITCOIN_QT_CHECK([AC_CHECK_HEADER([qrencode.h],, have_qrencode=no)])
+dnl libevent check
+if test x$build_bitcoin_cli$build_bitcoind$bitcoin_enable_qt$use_tests$use_bench != xnonononono; then
+  PKG_CHECK_MODULES([EVENT], [libevent >= 2.0.21], [use_libevent=yes], [AC_MSG_ERROR([libevent version 2.0.21 or greater not found.])])
+  if test x$TARGET_OS != xwindows; then
+    PKG_CHECK_MODULES([EVENT_PTHREADS], [libevent_pthreads >= 2.0.21],, [AC_MSG_ERROR([libevent_pthreads version 2.0.21 or greater not found.])])
   fi
 fi
+
+dnl QR Code encoding library check
+
+if test "x$use_qr" != xno; then
+  BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
+fi
+
+dnl curl check
+PKG_CHECK_MODULES([CURL], [libcurl],, [AC_MSG_ERROR([libcurl not found.])])
+AC_CHECK_HEADER([curl/curl.h],, [AC_MSG_ERROR([libcurl header not found.])])
+AC_CHECK_LIB([curl],         [main],CURL_LIBS=-lcurl, AC_MSG_ERROR(libcurl missing))
 
 save_CXXFLAGS="${CXXFLAGS}"
 CXXFLAGS="${CXXFLAGS} ${CRYPTO_CFLAGS} ${SSL_CFLAGS}"
@@ -1087,6 +1030,27 @@ AC_CHECK_LIB([crypto],[RAND_egd],[],[
   )
 ])
 
+dnl ZMQ check
+
+if test "x$use_zmq" = xyes; then
+  PKG_CHECK_MODULES([ZMQ], [libzmq >= 4],
+    AC_DEFINE([ENABLE_ZMQ], [1], [Define to 1 to enable ZMQ functions]),
+    [AC_DEFINE([ENABLE_ZMQ], [0], [Define to 1 to enable ZMQ functions])
+    AC_MSG_WARN([libzmq version 4.x or greater not found, disabling])
+    use_zmq=no])
+else
+  AC_DEFINE_UNQUOTED([ENABLE_ZMQ], [0], [Define to 1 to enable ZMQ functions])
+fi
+
+if test "x$use_zmq" = xyes; then
+  dnl Assume libzmq was built for static linking
+  case $host in
+    *mingw*)
+      ZMQ_CFLAGS="$ZMQ_CFLAGS -DZMQ_STATIC"
+    ;;
+  esac
+fi
+
 dnl univalue check
 
 need_bundled_univalue=yes
@@ -1095,47 +1059,27 @@ if test x$build_bitcoin_utils$build_bitcoind$bitcoin_enable_qt$use_tests$use_ben
   need_bundled_univalue=no
 else
 
-if test x$system_univalue != xno ; then
-  found_univalue=no
-  if test x$use_pkgconfig = xyes; then
-    : #NOP
-    m4_ifdef(
-      [PKG_CHECK_MODULES],
-      [
-        PKG_CHECK_MODULES([UNIVALUE],[libunivalue >= 1.0.4],[found_univalue=yes],[true])
-      ]
-    )
-  else
-    AC_CHECK_HEADER([univalue.h],[
-      AC_CHECK_LIB([univalue],  [main],[
-        UNIVALUE_LIBS=-lunivalue
-        found_univalue=yes
-      ],[true])
-    ],[true])
+  if test x$system_univalue != xno; then
+    PKG_CHECK_MODULES([UNIVALUE], [libunivalue >= 1.0.4], [found_univalue=yes], [found_univalue=no])
+    if test x$found_univalue = xyes; then
+      system_univalue=yes
+      need_bundled_univalue=no
+    elif test x$system_univalue = xyes; then
+      AC_MSG_ERROR([univalue not found])
+    else
+      system_univalue=no
+    fi
   fi
 
-   if test x$found_univalue = xyes ; then
-    system_univalue=yes
-    need_bundled_univalue=no
-  elif test x$system_univalue = xyes ; then
-    AC_MSG_ERROR([univalue not found])
-  else
-    system_univalue=no
+  if test x$need_bundled_univalue = xyes; then
+    UNIVALUE_CFLAGS='-I$(srcdir)/univalue/include'
+    UNIVALUE_LIBS='univalue/libunivalue.la'
   fi
-fi
-
-if test x$need_bundled_univalue = xyes ; then
-  UNIVALUE_CFLAGS='-I$(srcdir)/univalue/include'
-  UNIVALUE_LIBS='univalue/libunivalue.la'
-fi
-
 fi
 
 AM_CONDITIONAL([EMBEDDED_UNIVALUE],[test x$need_bundled_univalue = xyes])
 AC_SUBST(UNIVALUE_CFLAGS)
 AC_SUBST(UNIVALUE_LIBS)
-
-BITCOIN_QT_PATH_PROGS([PROTOC], [protoc],$protoc_bin_path)
 
 AC_MSG_CHECKING([whether to build prcycoind])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_bitcoind = xyes])
@@ -1322,6 +1266,8 @@ AC_SUBST(GPROF_LDFLAGS)
 AC_SUBST(HARDENED_CXXFLAGS)
 AC_SUBST(HARDENED_CPPFLAGS)
 AC_SUBST(HARDENED_LDFLAGS)
+AC_SUBST(LTO_CXXFLAGS)
+AC_SUBST(LTO_LDFLAGS)
 AC_SUBST(PIC_FLAGS)
 AC_SUBST(PIE_FLAGS)
 AC_SUBST(SANITIZER_CXXFLAGS)
@@ -1340,11 +1286,8 @@ AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
 AC_SUBST(CRYPTO_LIBS)
 AC_SUBST(SSL_LIBS)
-AC_SUBST(EVENT_LIBS)
-AC_SUBST(EVENT_PTHREADS_LIBS)
-AC_SUBST(ZMQ_LIBS)
-AC_SUBST(PROTOBUF_LIBS)
-AC_SUBST(QR_LIBS)
+AC_SUBST(CURL_CFLAGS)
+AC_SUBST(CURL_LIBS)
 AC_SUBST(USE_NUM_OPENSSL)
 AC_SUBST(HAVE_FDATASYNC)
 AC_SUBST(HAVE_FULLFSYNC)
@@ -1357,6 +1300,7 @@ AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi share/qt
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
 AM_COND_IF([HAVE_DOXYGEN], [AC_CONFIG_FILES([doc/Doxyfile])])
 AC_CONFIG_LINKS([contrib/filter-lcov.py:contrib/filter-lcov.py])
+AC_CONFIG_LINKS([contrib/macdeploy/background.tiff:contrib/macdeploy/background.tiff])
 AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])
 AC_CONFIG_LINKS([test/util/bitcoin-util-test.py:test/util/bitcoin-util-test.py])
 AC_CONFIG_LINKS([test/util/rpcauth-test.py:test/util/rpcauth-test.py])
@@ -1430,6 +1374,7 @@ echo "  sanitizers    = $use_sanitizers"
 echo "  debug enabled = $enable_debug"
 echo "  gprof enabled = $enable_gprof"
 echo "  werror        = $enable_werror"
+echo "  LTO           = $enable_lto"
 echo
 echo "  target os     = $TARGET_OS"
 echo "  build os      = $BUILD_OS"
@@ -1438,8 +1383,9 @@ echo "  CC            = $CC"
 echo "  CFLAGS        = $CFLAGS"
 echo "  CPPFLAGS      = $DEBUG_CPPFLAGS $HARDENED_CPPFLAGS $CPPFLAGS"
 echo "  CXX           = $CXX"
-echo "  CXXFLAGS      = $DEBUG_CXXFLAGS $HARDENED_CXXFLAGS $WARN_CXXFLAGS $NOWARN_CXXFLAGS $ERROR_CXXFLAGS $GPROF_CXXFLAGS $CXXFLAGS"
-echo "  LDFLAGS       = $PTHREAD_CFLAGS $HARDENED_LDFLAGS $GPROF_LDFLAGS $LDFLAGS"
+echo "  CXXFLAGS      = $LTO_CXXFLAGS $DEBUG_CXXFLAGS $HARDENED_CXXFLAGS $WARN_CXXFLAGS $NOWARN_CXXFLAGS $ERROR_CXXFLAGS $GPROF_CXXFLAGS $CXXFLAGS"
+echo "  LDFLAGS       = $LTO_LDFLAGS $PTHREAD_CFLAGS $HARDENED_LDFLAGS $GPROF_LDFLAGS $LDFLAGS"
+echo "  AR            = $AR"
 echo "  ARFLAGS       = $ARFLAGS"
 echo "  PIC_FLAGS     = $PIC_FLAGS"
 echo "  QT_PIE_FLAGS  = $QT_PIE_FLAGS"

@@ -2,6 +2,8 @@ UNIX BUILD NOTES
 ====================
 Some notes on how to build PRCYCoin in Unix.
 
+(For BSD specific instructions, see `build-*bsd.md` in this directory.)
+
 Note
 ---------------------
 Always use absolute paths to configure and compile PRCYCoin and the dependencies,
@@ -42,7 +44,6 @@ Optional dependencies:
  miniupnpc   | UPnP Support     | Firewall-jumping support
  libdb4.8    | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  qt          | GUI              | GUI toolkit (only needed when GUI enabled)
- protobuf    | Payments in GUI  | Data interchange format used for payment protocol (only needed when GUI enabled)
  libqrencode | QR codes in GUI  | Optional for generating QR codes (only needed when GUI enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.0.0)
@@ -114,7 +115,7 @@ To build without GUI pass `--without-gui`.
 
 To build with Qt 5 you need the following:
 
-    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
+    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools
 
 libqrencode (optional) can be installed with:
 
@@ -138,7 +139,7 @@ Optional:
 
 To build with Qt 5 you need the following:
 
-    sudo dnf install qt5-qttools-devel qt5-qtbase-devel protobuf-devel
+    sudo dnf install qt5-qttools-devel qt5-qtbase-devel
 
 libqrencode (optional) can be installed with:
 
@@ -277,7 +278,7 @@ To build executables for ARM:
     make HOST=arm-linux-gnueabihf NO_QT=1
     cd ..
     ./autogen.sh
-    ./configure --prefix=$PWD/depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
+    CONFIG_SITE=$PWD/depends/arm-linux-gnueabihf/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
     make
 
 

@@ -151,6 +151,18 @@ Most autotools projects can be properly staged using:
 
     $(MAKE) DESTDIR=$($(package)_staging_dir) install
 
+## Build outputs:
+
+In general, the output of a depends package should not contain any libtool
+archives. Instead, the package should output `.pc` (`pkg-config`) files where
+possible.
+
+From the [Gentoo Wiki entry](https://wiki.gentoo.org/wiki/Project:Quality_Assurance/Handling_Libtool_Archives):
+
+>  Libtool pulls in all direct and indirect dependencies into the .la files it
+>  creates. This leads to massive overlinking, which is toxic to the Gentoo
+>  ecosystem, as it leads to a massive number of unnecessary rebuilds.
+
 ## Secondary dependencies:
 
 Secondary dependency packages relative to the bitcoin binaries/libraries (i.e.
@@ -169,3 +181,18 @@ For us, it's much easier to just link a static `libsecondary` into a shared
 static or dynamic `libseconday`, that's not our concern. With a static
 `libseconday`, when we need to link `libprimary` into our executable, there's no
 dependency chain to worry about as `libprimary` has all the symbols.
+
+## Build targets:
+
+To build an individual package (useful for debugging), following build targets are available.
+
+    make ${package}
+    make ${package}_fetched
+    make ${package}_extracted
+    make ${package}_preprocessed
+    make ${package}_configured
+    make ${package}_built
+    make ${package}_staged
+    make ${package}_postprocessed
+    make ${package}_cached
+    make ${package}_cached_checksum

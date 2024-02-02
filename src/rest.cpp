@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "main.h"
 #include "httpserver.h"
+#include "rpc/blockchain.h"
 #include "rpc/server.h"
 #include "streams.h"
 #include "sync.h"
@@ -17,10 +18,8 @@
 #include <univalue.h>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/dynamic_bitset.hpp>
 
 static const size_t MAX_GETUTXOS_OUTPOINTS = 15; //allow a max of 15 outpoints to be queried at once
-
 
 enum RetFormat {
     RF_UNDEF,
@@ -54,18 +53,9 @@ struct CCoin {
     }
 };
 
-
-extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
-
-extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false);
-
-extern UniValue mempoolInfoToJSON();
-
-extern UniValue mempoolToJSON(bool fVerbose = false);
-
-extern void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fIncludeHex);
-
-extern UniValue blockheaderToJSON(const CBlockIndex *blockindex);
+/* Defined in rawtransaction.cpp */
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
+void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status, std::string message) {
     req->WriteHeader("Content-Type", "text/plain");
@@ -485,7 +475,8 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart) {
     std::vector<unsigned char> bitmap;
     std::vector<CCoin> outs;
     std::string bitmapStringRepresentation;
-    boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
+    std::vector<bool> hits;
+    bitmap.resize((vOutPoints.size() + 7) / 8);
     {
         LOCK2(cs_main, mempool.cs);
 
@@ -501,12 +492,12 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart) {
         for (size_t i = 0; i < vOutPoints.size(); i++) {
             CCoins coins;
             uint256 hash = vOutPoints[i].hash;
+            bool hit = false;
             if (view.GetCoins(hash, coins)) {
                 mempool.pruneSpent(hash, coins);
                 if (coins.IsAvailable(vOutPoints[i].n)) {
-                    hits[i] = true;
+                    hit = true;
                     // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
-
                     // n is valid but points to an already spent output (IsNull).
                     CCoin coin;
                     coin.nTxVer = coins.nVersion;
@@ -517,11 +508,12 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart) {
                 }
             }
 
-            bitmapStringRepresentation.append(
-                    hits[i] ? "1" : "0"); // form a binary string representation (human-readable for json output)
+            hits.push_back(hit);
+            bitmapStringRepresentation.append(hit ? "1" : "0"); // form a binary string representation (human-readable for json output)
+            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
         }
     }
-    boost::to_block_range(hits, std::back_inserter(bitmap));
+
     switch (rf) {
         case RF_BINARY: {
             // serialize data
@@ -550,24 +542,24 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart) {
 
             // pack in some essentials
             // use more or less the same output as mentioned in Bip64
-            objGetUTXOResponse.push_back(Pair("chainHeight", chainActive.Height()));
-            objGetUTXOResponse.push_back(Pair("chaintipHash", chainActive.Tip()->GetBlockHash().GetHex()));
-            objGetUTXOResponse.push_back(Pair("bitmap", bitmapStringRepresentation));
+            objGetUTXOResponse.pushKV("chainHeight", chainActive.Height());
+            objGetUTXOResponse.pushKV("chaintipHash", chainActive.Tip()->GetBlockHash().GetHex());
+            objGetUTXOResponse.pushKV("bitmap", bitmapStringRepresentation);
 
             UniValue utxos(UniValue::VARR);
             for (  const CCoin &coin : outs) {
                 UniValue utxo(UniValue::VOBJ);
-                utxo.push_back(Pair("txvers", (int32_t) coin.nTxVer));
-                utxo.push_back(Pair("height", (int32_t) coin.nHeight));
-                utxo.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
+                utxo.pushKV("txvers", (int32_t) coin.nTxVer);
+                utxo.pushKV("height", (int32_t) coin.nHeight);
+                utxo.pushKV("value", ValueFromAmount(coin.out.nValue));
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
                 ScriptPubKeyToJSON(coin.out.scriptPubKey, o, true);
-                utxo.push_back(Pair("scriptPubKey", o));
+                utxo.pushKV("scriptPubKey", o);
                 utxos.push_back(utxo);
             }
-            objGetUTXOResponse.push_back(Pair("utxos", utxos));
+            objGetUTXOResponse.pushKV("utxos", utxos);
 
             // return json string
             std::string strJSON = objGetUTXOResponse.write() + "\n";

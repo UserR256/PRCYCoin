@@ -13,9 +13,9 @@ When complete, it will have produced `PRCYcoin-Core.dmg`.
 ### Step 1: Obtaining `Xcode.app`
 
 Our current macOS SDK
-(`Xcode-11.3.1-11C505-extracted-SDK-with-libcxx-headers.tar.gz`) can be
+(`Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz`) can be
 extracted from
-[Xcode_11.3.1.xip](https://download.developer.apple.com/Developer_Tools/Xcode_11.3.1/Xcode_11.3.1.xip).
+[Xcode_12.1.xip](https://download.developer.apple.com/Developer_Tools/Xcode_12.1/Xcode_12.1.xip).
 An Apple ID is needed to download this.
 
 After Xcode version 7.x, Apple started shipping the `Xcode.app` in a `.xip`
@@ -27,25 +27,25 @@ approach (tested on Debian Buster) is outlined below:
 apt install cpio
 git clone https://github.com/bitcoin-core/apple-sdk-tools.git
 
-# Unpack Xcode_11.3.1.xip and place the resulting Xcode.app in your current
+# Unpack Xcode_12.1.xip and place the resulting Xcode.app in your current
 # working directory
-python3 apple-sdk-tools/extract_xcode.py -f Xcode_11.3.1.xip | cpio -d -i
+python3 apple-sdk-tools/extract_xcode.py -f Xcode_12.1.xip | cpio -d -i
 ```
 
 On macOS the process is more straightforward:
 
 ```bash
-xip -x Xcode_11.3.1.xip
+xip -x Xcode_12.1.xip
 ```
 
-### Step 2: Generating `Xcode-11.3.1-11C505-extracted-SDK-with-libcxx-headers.tar.gz` from `Xcode.app`
+### Step 2: Generating `Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz` from `Xcode.app`
 
-To generate `Xcode-11.3.1-11C505-extracted-SDK-with-libcxx-headers.tar.gz`, run
+To generate `Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz`, run
 the script [`gen-sdk`](./gen-sdk) with the path to `Xcode.app` (extracted in the
 previous stage) as the first argument.
 
 ```bash
-# Generate a Xcode-11.3.1-11C505-extracted-SDK-with-libcxx-headers.tar.gz from
+# Generate a Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz from
 # the supplied Xcode.app
 ./contrib/macdeploy/gen-sdk '/path/to/Xcode.app'
 ```
@@ -92,22 +92,9 @@ created using these tools. The build process has been designed to avoid includin
 SDK's files in Gitian's outputs. All interim tarballs are fully deterministic and may be freely
 redistributed.
 
-`genisoimage` is used to create the initial DMG. It is not deterministic as-is, so it has been
-patched. A system `genisoimage` will work fine, but it will not be deterministic because
-the file-order will change between invocations. The patch can be seen here: [cdrkit-deterministic.patch](https://github.com/prcycoin/prcycoin/blob/master/depends/patches/native_cdrkit/cdrkit-deterministic.patch).
-No effort was made to fix this cleanly, so it likely leaks memory badly, however it's only used for
-a single invocation, so that's no real concern.
+[`xorrisofs`](https://www.gnu.org/software/xorriso/) is used to create the DMG.
 
-`genisoimage` cannot compress DMGs, so afterwards, the DMG tool from the
-`libdmg-hfsplus` project is used to compress it. There are several bugs in this tool and its
-maintainer has seemingly abandoned the project.
-
-The DMG tool has the ability to create DMGs from scratch as well, but this functionality is
-broken. Only the compression feature is currently used. Ideally, the creation could be fixed
-and `genisoimage` would no longer be necessary.
-
-Background images and other features can be added to DMG files by inserting a
-`.DS_Store` during creation.
+A background image is added to DMG files by inserting a `.DS_Store` during creation.
 
 As of OS X 10.9 Mavericks, using an Apple-blessed key to sign binaries is a requirement in
 order to satisfy the new Gatekeeper requirements. Because this private key cannot be

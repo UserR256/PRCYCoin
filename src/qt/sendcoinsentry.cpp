@@ -129,15 +129,16 @@ static inline int64_t roundint64(double d)
     return (int64_t)(d > 0 ? d + 0.5 : d - 0.5);
 }
 
-CAmount SendCoinsEntry::getValidatedAmount() {
+CAmount SendCoinsEntry::getValidatedAmount()
+{
     double dAmount = ui->payAmount->text().toDouble();
-    if (dAmount < 0.0 || dAmount > MAX_MONEY_OUT) {
-        QMessageBox msgBox;
-        msgBox.setWindowTitle("Invalid Amount");
-        msgBox.setText("Invalid amount entered. Please enter an amount less than 2.1B PRCY.");
-        msgBox.setStyleSheet(GUIUtil::loadStyleSheet());
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.exec();
+    CAmount maxMoneyInCoins = MAX_MONEY_OUT / COIN;
+    CAmount maxMoneyInMillions = maxMoneyInCoins / 1000000;
+    if (dAmount < 0.0 || dAmount > maxMoneyInCoins) {
+        GUIUtil::showMessageBox(
+            tr("Invalid Amount"),
+            tr("Invalid amount entered. Please enter an amount less than %1 (%2M) PRCY.").arg(maxMoneyInCoins).arg(maxMoneyInMillions),
+            QMessageBox::Warning);
     }
     CAmount nAmount = roundint64(dAmount * COIN);
     return nAmount;
@@ -145,11 +146,6 @@ CAmount SendCoinsEntry::getValidatedAmount() {
 
 SendCoinsRecipient SendCoinsEntry::getValue()
 {
-    // Payment request
-    if (recipient.paymentRequest.IsInitialized())
-        return recipient;
-
-    // Normal payment
     recipient.address = ui->payTo->text();
     recipient.label = ui->addAsLabel->text();
     recipient.amount = getValidatedAmount();
@@ -169,24 +165,6 @@ void SendCoinsEntry::setValue(const SendCoinsRecipient& value)
 {
     recipient = value;
 
-    if (recipient.paymentRequest.IsInitialized()) // payment request
-    {
-        if (recipient.authenticatedMerchant.isEmpty()) // insecure
-        {
-            ui->payTo_is->setText(recipient.address);
-            ui->memoTextLabel_is->setText(recipient.message);
-            ui->payAmount_is->setValue(recipient.amount);
-            ui->payAmount_is->setReadOnly(true);
-            setCurrentWidget(ui->SendCoins_InsecurePaymentRequest);
-        } else // secure
-        {
-            ui->payTo_s->setText(recipient.authenticatedMerchant);
-            ui->memoTextLabel_s->setText(recipient.message);
-            ui->payAmount_s->setValue(recipient.amount);
-            ui->payAmount_s->setReadOnly(true);
-            setCurrentWidget(ui->SendCoins_SecurePaymentRequest);
-        }
-    } else // normal payment
     {
         ui->addAsLabel->clear();
         ui->payTo->setText(recipient.address); // this may set a label from addressbook
